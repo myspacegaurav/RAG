@@ -4,17 +4,19 @@ with open('notes.txt', "r") as file:
   document = file.read()
 
 #split document - size based
-def chunker(text, size):
-  text = text.split()
+def chunker(text, size, overlap):
+  words = text.split()
   chunks = []
 
-  for i in range(0,len(text), size):
-    words = " ".join(text[i : i + size])
-    chunks.append(words) 
+  i = 0
+  while i < len(words):
+      chunk = " ".join(words[i:i+size])
+      chunks.append(chunk)
+      i += size - overlap
   
   return chunks
 
-chunks = chunker(document, 50)
+chunks = chunker(document, 8, 6)
 
 #embeddings
 from langchain_ollama import OllamaEmbeddings
@@ -40,7 +42,8 @@ context = []
 
 for i in range(len(embeddings)):
   cos = cos_sim(q_embed, embeddings[i])
-  context.append([cos, chunks[i]])
+  if(cos > 0.3):
+    context.append([cos, chunks[i]])
   
 
 context.sort(reverse=True)
@@ -50,7 +53,7 @@ for i in range(min(k, len(context))):
   top_doc.append(context[i][1])
 
 context_str = "\n".join(top_doc)
-print(context_str)
+
 
 #combine retrieval + LLM
 from langchain_ollama import ChatOllama
@@ -61,9 +64,20 @@ chat_model = ChatOllama(
 )
 
 prompt = f"""
-  query : {query}
-  context : {context_str}
-  answer:
+You are a helpful assistant.
+
+Rules:
+- Use ONLY the provided context
+- If answer is not in context, say "I don't know"
+- Keep answer concise
+
+Context:
+{context_str}
+
+Question:
+{query}
+
+Answer:
 """
 
 response = chat_model.invoke(prompt)
