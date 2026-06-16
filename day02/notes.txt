@@ -1,0 +1,3 @@
+RAG stands for Retrieval Augmented Generation.
+It helps AI give better answers by using external data.
+Python is commonly used for building RAG systems.
