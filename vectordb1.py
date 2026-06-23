@@ -6,20 +6,28 @@ embed = OllamaEmbeddings(model="nomic-embed-text")
 
 documents = [
   "AI is the simulation of human intelligence",
+  "This is an indexing error because embedding matrix does not updated.",
   "Machine learning is a subset of AI",
   "Football is a sport",
   "Python is used in AI"
 ]
 
-embeddings = []
-for doc in documents:
-  embeddings.append(embed.embed_query(doc))
+import os
 
-vector = np.array(embeddings).astype("float32")
+INDEX_PATH = 'index.faiss'
 
-index = faiss.IndexFlatL2(len(vector[0]))
+if os.path.exists(INDEX_PATH):
+  index = faiss.read_index(INDEX_PATH)
 
-index.add(vector)
+else:
+  embeddings = []
+  for doc in documents:
+    embeddings.append(embed.embed_query(doc))
+
+  vector = np.array(embeddings).astype("float32")
+  index = faiss.IndexFlatL2(len(vector[0]))
+  index.add(vector)
+  faiss.write_index(index, "index.faiss")
 
 query = input("ask anything: ")
 
@@ -35,3 +43,5 @@ top_docs = []
 
 for i in indices[0]:
   top_docs.append(documents[i])
+
+print(top_docs)
