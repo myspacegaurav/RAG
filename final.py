@@ -27,30 +27,24 @@ for i in chunks:
   embeddings.append(embed.embed_query(i))
 
 import numpy as np
+import faiss
 
-def cos_sim(a, b):
-  return np.dot(a,b)/ (np.linalg.norm(a)*np.linalg.norm(b))
+vector = np.array(embeddings).astype('float32')
+
+index = faiss.IndexFlatL2(len(vector[0]))
+
+index.add(vector)
 
 query = input("ask your question :")
-q_embed = embed.embed_query(query)
-
-#top k retrieval
-#get the k top similar context, sort them on the basis of cosine similarity
+q_embed = np.array([embed.embed_query(query)]).astype('float32')
 
 k = 2
-context = []
-
-for i in range(len(embeddings)):
-  cos = cos_sim(q_embed, embeddings[i])
-  if(cos > 0.3):
-    context.append([cos, chunks[i]])
-  
-
-context.sort(reverse=True)
+distance, indices = index.search(q_embed, k)
 
 top_doc = []
-for i in range(min(k, len(context))):
-  top_doc.append(context[i][1])
+for j in indices[0]:
+  top_doc.append(chunks[j])
+      
 
 context_str = "\n".join(top_doc)
 
@@ -64,12 +58,11 @@ chat_model = ChatOllama(
 )
 
 prompt = f"""
-You are a helpful assistant.
-
-Rules:
-- Use ONLY the provided context
-- If answer is not in context, say "I don't know"
-- Keep answer concise
+You are a helpful assistant. You MUST follow these rules strictly:
+- Answer ONLY using the context below
+- If the context does not contain the answer, respond with exactly: "I don't know"
+- Do NOT use any outside knowledge
+- Do NOT guess
 
 Context:
 {context_str}
