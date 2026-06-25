@@ -74,7 +74,6 @@ chat_model = ChatOllama(
 prompt = f"""
 You are a helpful assistant. You MUST follow these rules strictly:
 - Answer ONLY using the context given below
-- Is the answer to the question present in the context above? If yes, answer   using ONLY the context. If no, say "I don't know".
 Answer:- Do NOT use any outside knowledge
 - Do NOT guess
 - keep simple short answer
@@ -89,11 +88,27 @@ Answer:
 """
 
 
+#validation-step to minimize hallucination
 response = chat_model.invoke(prompt)
-if "I don't know" in response.content:
-  print("Low confidence answer")
 
-print(response.content)
-print("\n--- Sources Used ---")
-for s in sources:
-    print(s)
+query_embed = np.array(embed.embed_query(query)).astype('float32')
+
+def cosine_similarity(a, b):
+    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+
+similarities = []
+for c in top_doc:
+   chunk_embed = np.array(embed.embed_query(c)).astype("float32")
+   sim = cosine_similarity(chunk_embed, query_embed)
+   similarities.append(sim)
+
+max_sim = max(similarities)
+THRESHOLD = 0.7 
+
+if max_sim > THRESHOLD:
+  print(response.content)
+  print("\n--- Sources Used ---")
+  for s in sources:
+      print(s)
+else:
+   print("I Don't know")
