@@ -1,5 +1,9 @@
-my name is gaurav.
-my brother is saurav.
-saurav is noob.
-saurav is gaurav's brother.
-saurav is persuaing medical science.
+Machine learning is a subset of AI used in many applications.
+It helps systems learn from data without explicit programming.
+Artificial Intelligence is a broad field.
+Machine Learning is a subset of AI.
+Deep Learning is a subset of Machine Learning.
+It uses neural networks for complex tasks.
+Machine learning is a subset of artificial intelligence that allows systems 
+to learn from data without being explicitly programmed. It is widely used 
+in applications such as recommendation systems, fraud detection, and self-driving cars.
