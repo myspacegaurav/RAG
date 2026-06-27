@@ -107,7 +107,6 @@ Question:
 Answer:
 """
 
-
 #validation-step to minimize hallucination
 response = chat_model.invoke(prompt).content
 
