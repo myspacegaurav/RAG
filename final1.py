@@ -2,15 +2,15 @@
 doc_path = [r"notes\os.txt", r"notes\coa.txt", r"notes\rdbms.txt", r"notes\ml.txt"]
 
 #split document - size based
-def chunker(text, size, overlap):
-  words = text.split()
+def chunker(text):
+  words = text.split(".")
   chunks = []
 
   i = 0
   while i < len(words):
-      chunk = " ".join(words[i:i+size])
+      chunk = words[i]
       chunks.append(chunk)
-      i += size - overlap
+      i+=1
   
   return chunks
 
@@ -20,46 +20,29 @@ embed = OllamaEmbeddings(model="nomic-embed-text")
 
 import numpy as np
 import faiss
-import os
-import pickle
 
-INDEX_PATH = "index.faiss"
-CHUNKS_PATH = 'chunks.pkl'
+chunks = []
 
-if os.path.exists(INDEX_PATH) and os.path.exists(CHUNKS_PATH):
-  index = faiss.read_index(INDEX_PATH)
-  with open(CHUNKS_PATH, "rb") as f:
-    data = pickle.load(f)
-    chunks, metadata = data["chunks"], data["metadata"]
-
-else:
-  chunks = []
-  metadata = []
-
-  for doc in doc_path:
-   with open(doc, "r") as file:
+for doc in doc_path:
+  with open(doc, "r") as file:
     document = file.read()
 
-    chunk_doc = chunker(document, 30, 5)
-    for c in chunk_doc:
-      chunks.append(c)
-      metadata.append({
-        "sources" : doc,
-        "chunk" : len(chunks) - 1
-      })
+  chunk_doc = chunker(document)
+  for c in chunk_doc:
+    chunks.append({
+       "text" : c,
+      "sources" : doc,
+      "chunk" : len(chunks) - 1
+    })
 
-  embeddings = []
-  for i in chunks:
-    embeddings.append(embed.embed_query(i))
+embeddings = []
+for i in chunks:
+  embeddings.append(embed.embed_query(i["text"]))
 
-  vector = np.array(embeddings).astype('float32')
-  faiss.normalize_L2(vector)
-  index = faiss.IndexFlatIP(len(vector[0]))
-  index.add(vector)
-
-  faiss.write_index(index, INDEX_PATH)
-  with open(CHUNKS_PATH, "wb") as f:
-    pickle.dump({"chunks": chunks, "metadata": metadata}, f)
+vector = np.array(embeddings).astype('float32')
+faiss.normalize_L2(vector)
+index = faiss.IndexFlatIP(len(vector[0]))
+index.add(vector)
 
 query = input("ask your question: ")
 q_embed = np.array([embed.embed_query(query)]).astype('float32')
@@ -73,8 +56,8 @@ sources = []
 THRESHOLD = 0.65
 for j,score in zip(indices[0], distance[0]):
   if score >= THRESHOLD:
-    top_doc.append((chunks[j]))
-    sources.append(metadata[j])
+    top_doc.append((chunks[j]["text"]))
+    sources.append(chunks[j]["sources"])
 
 if not top_doc:
     print("I don't know")
