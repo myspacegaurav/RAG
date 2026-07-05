@@ -1,7 +1,7 @@
 #better chunking
 doc_path = [r"notes\os.txt", r"notes\coa.txt", r"notes\rdbms.txt", r"notes\ml.txt"]
 
-#split document - size based
+#split document - sentence based
 def chunker(text):
   words = text.split(".")
   chunks = []

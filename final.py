@@ -1,6 +1,9 @@
 #better chunking
 doc_path = [r"notes\os.txt", r"notes\coa.txt", r"notes\rdbms.txt", r"notes\ml.txt"]
 
+from langchain_community.document_loaders import TextLoader
+from langchain_core.documents import Document
+
 #split document - size based
 def chunker(text, size, overlap):
   words = text.split()
@@ -18,8 +21,7 @@ def chunker(text, size, overlap):
 from langchain_ollama import OllamaEmbeddings
 embed = OllamaEmbeddings(model="nomic-embed-text")
 
-import numpy as np
-import faiss
+from langchain_community.vectorstores import FAISS
 import os
 import pickle
 
@@ -27,55 +29,43 @@ INDEX_PATH = "index.faiss"
 CHUNKS_PATH = 'chunks.pkl'
 
 if os.path.exists(INDEX_PATH) and os.path.exists(CHUNKS_PATH):
-  index = faiss.read_index(INDEX_PATH)
+  embeddings = FAISS.load_local(INDEX_PATH, embed, allow_dangerous_deserialization=True)
   with open(CHUNKS_PATH, "rb") as f:
     data = pickle.load(f)
-    chunks, metadata = data["chunks"], data["metadata"]
+    chunks = data["chunks"]
 
 else:
+  documents = []
   chunks = []
-  metadata = []
-
   for doc in doc_path:
-   with open(doc, "r") as file:
-    document = file.read()
+    loader = TextLoader(doc)  
+    documents.extend(loader.load())
 
-    chunk_doc = chunker(document, 30, 5)
-    for c in chunk_doc:
-      chunks.append(c)
-      metadata.append({
-        "sources" : doc,
-        "chunk" : len(chunks) - 1
-      })
+  chunks = []
+  for chunk in documents:
+     c = chunk.page_content
+     for chunk_text in chunker(c, 200, 50):
+      chunks.append(Document(page_content= chunk_text, 
+                              metadata = {"source":chunk.metadata["source"]}))
 
-  embeddings = []
-  for i in chunks:
-    embeddings.append(embed.embed_query(i))
-
-  vector = np.array(embeddings).astype('float32')
-  faiss.normalize_L2(vector)
-  index = faiss.IndexFlatIP(len(vector[0]))
-  index.add(vector)
-
-  faiss.write_index(index, INDEX_PATH)
+  embeddings = FAISS.from_documents(chunks, embed)
+  
+  embeddings.save_local(INDEX_PATH)
   with open(CHUNKS_PATH, "wb") as f:
-    pickle.dump({"chunks": chunks, "metadata": metadata}, f)
+    pickle.dump({"chunks": chunks}, f)
 
 query = input("ask your question: ")
-q_embed = np.array([embed.embed_query(query)]).astype('float32')
-faiss.normalize_L2(q_embed)
 
 k = 5
-distance, indices = index.search(q_embed, k)
+result = embeddings.similarity_search_with_score(query, k)
 
 top_doc = []
-sources = []
-THRESHOLD = 0.65
-for j,score in zip(indices[0], distance[0]):
-  if score >= THRESHOLD:
-    top_doc.append((chunks[j]))
-    sources.append(metadata[j])
 
+THRESHOLD = 0.65
+for doc, score in result:
+   if score <= THRESHOLD:
+      top_doc.append(doc.page_content)
+   
 if not top_doc:
     print("I don't know")
     exit()
@@ -110,15 +100,9 @@ Answer:
 #validation-step to minimize hallucination
 response = chat_model.invoke(prompt).content
 
-response_embed = np.array([embed.embed_query(response)]).astype('float32')
-faiss.normalize_L2(response_embed)
-k = 1
-res_dist, _ = index.search(response_embed, k)
+hallucinate = embeddings.similarity_search_with_score(response, k = 1)
 
-if res_dist[0][0] > THRESHOLD:
-  print(response)
-  print("\n--- Sources Used ---")
-  for s in sources:
-      print(s)
-else:
-   print("I Don't know")
+for _, s in hallucinate:
+   if(s <= THRESHOLD):
+      print(response)
+    
