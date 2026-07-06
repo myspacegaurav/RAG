@@ -54,26 +54,7 @@ else:
   with open(CHUNKS_PATH, "wb") as f:
     pickle.dump({"chunks": chunks}, f)
 
-query = input("ask your question: ")
 
-k = 5
-result = embeddings.similarity_search_with_score(query, k)
-
-top_doc = []
-
-THRESHOLD = 0.65
-for doc, score in result:
-   if score <= THRESHOLD:
-      top_doc.append(doc.page_content)
-   
-if not top_doc:
-    print("I don't know")
-    exit()
-else:
-  context_str = "\n".join(top_doc)
-
-
-# combine retrieval + LLM
 from langchain_ollama import ChatOllama
 
 chat_model = ChatOllama(
@@ -81,12 +62,58 @@ chat_model = ChatOllama(
   temperature=0
 )
 
+query = input("ask your question: ")
+
+#multiquerying
+
+def generate_queries(original_query, n=3):
+    prompt = f"""Generate {n} different ways to ask the following question.
+Return only the questions, one per line, no numbering, no extra text.
+Question: {original_query}"""
+    
+    response = chat_model.invoke(prompt).content
+    queries = [q.strip() for q in response.split('\n') if q.strip()]
+    queries.append(original_query)
+    return queries
+
+queries = generate_queries(query)
+
+#deduplication using set 
+
+def multiquery(queries, embeddings, k = 2, threshold = 0.65):
+   seen = set()
+   unique_docs = []
+
+   for q in queries:
+    results = embeddings.similarity_search_with_score(q, k)      
+    for doc, score in results:
+          if score <= threshold and doc.page_content not in seen:
+              seen.add(doc.page_content)
+              unique_docs.append(doc)
+    
+    return unique_docs
+
+
+top_doc = multiquery(queries, embeddings)
+   
+#augumentation
+
+if not top_doc:
+    print("I don't know")
+    exit()
+else:
+  context_str = "\n".join([doc.page_content for doc in top_doc])
+  
+
+
+
+#generation 
+
 prompt = f"""
 You are a helpful assistant. You MUST follow these rules strictly:
 - Answer ONLY using the context given below
 Answer:- Do NOT use any outside knowledge
 - Do NOT guess
-- keep simple short answer
 
 Context:
 {context_str}
@@ -102,7 +129,8 @@ response = chat_model.invoke(prompt).content
 
 hallucinate = embeddings.similarity_search_with_score(response, k = 1)
 
+THRESHOLD = 0.65
 for _, s in hallucinate:
    if(s <= THRESHOLD):
-      print(response)
+    print(response)
     

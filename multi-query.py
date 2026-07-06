@@ -6,15 +6,16 @@ chat = ChatOllama(
 )
 
 query = input()
-queries = [
-    query,
-    "Explain " + query,
-    "Definition of " + query
-]
 
-response = chat.invoke(queries)
-# queries = [q.strip() for q in response.content.split('\n') if q.strip()]
+prompt = f"""Generate {4} different ways to ask the following question.
+Return only the questions, one per line, no numbering, no extra text.
+Question: {query}"""
 
-# print(queries)
+queries = chat.invoke(prompt)
 
-print(response.content)
+multiquery = []
+for str in queries.content.split('\n') :
+  str = str.strip()
+  multiquery.append(str)
+
+print(multiquery)
