@@ -63,7 +63,6 @@ chat_model = ChatOllama(
 )
 
 query = input("ask your question: ")
-
 #multiquerying
 
 def generate_queries(original_query, n=3):
@@ -81,17 +80,17 @@ queries = generate_queries(query)
 #deduplication using set 
 
 def multiquery(queries, embeddings, k = 2, threshold = 0.65):
-   seen = set()
-   unique_docs = []
+  seen = set()
+  unique_docs = []
 
-   for q in queries:
+  for q in queries:
     results = embeddings.similarity_search_with_score(q, k)      
     for doc, score in results:
-          if score <= threshold and doc.page_content not in seen:
-              seen.add(doc.page_content)
-              unique_docs.append(doc)
+      if score <= threshold and doc.page_content not in seen:
+        seen.add(doc.page_content)
+        unique_docs.append(doc)
     
-    return unique_docs
+  return unique_docs
 
 
 top_doc = multiquery(queries, embeddings)
@@ -129,7 +128,7 @@ response = chat_model.invoke(prompt).content
 
 hallucinate = embeddings.similarity_search_with_score(response, k = 1)
 
-THRESHOLD = 0.65
+THRESHOLD = 0.5
 for _, s in hallucinate:
    if(s <= THRESHOLD):
     print(response)
